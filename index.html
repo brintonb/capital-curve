@@ -201,8 +201,26 @@ let chart = new Chart(ctx, {
   options: {
     responsive: true,
     scales: {
-      y: { beginAtZero: true, suggestedMax: 11, grid: { color:'rgba(0,0,0,0.08)'} },
-      x: { grid: { color:'rgba(0,0,0,0.05)'} }
+      y: {
+        beginAtZero: true,
+        suggestedMax: 11,
+        grid: { color: 'rgba(0,0,0,0.08)' },
+        title: {
+          display: true,
+          text: 'Relative Capital Required',   // <-- Y‑axis label
+          color: '#000',
+          font: { family: 'Signika', weight: '600' }
+        }
+      },
+      x: {
+        grid: { color: 'rgba(0,0,0,0.05)' },
+        title: {
+          display: true,
+          text: 'Milestones',                  // <-- (optional) X‑axis label
+          color: '#666',
+          font: { family: 'Signika', weight: '600' }
+        }
+      }
     },
     plugins: { legend: { display:false } }
   }
