@@ -167,21 +167,38 @@ const summaryDiv = document.getElementById('summary');
 
 function makeSlider(label, idx, val){
   const wrap = document.createElement('div');
+
   const lab = document.createElement('label');
   lab.textContent = label;
+
   const input = document.createElement('input');
-  input.type = 'range'; input.min = 0; input.max = 1; input.step = 0.05;
-  input.value = val;
+  input.type = 'range';
+  input.min = '0';
+  input.max = '1';
+  input.step = '0.05';
+  input.value = String(val);
+
   const meter = document.createElement('div');
-  meter.className = 'hint'; meter.textContent = `AI leverage: ${val}`;
-  input.addEventListener('input', e=>{
-    ai[idx] = parseFloat(e.target.value);
-    meter.textContent = `AI leverage: ${e.target.value}`;
-    update();
-  });
-  wrap.appendChild(lab); wrap.appendChild(input); wrap.appendChild(meter);
+  meter.className = 'hint';
+  meter.textContent = `AI leverage: ${val}`;
+
+  // Helper to apply the new value
+  const apply = (v) => {
+    const num = Number(v);          // <-- guarantee numeric
+    ai[idx] = isNaN(num) ? 0 : num; // <-- guard against NaN
+    meter.textContent = `AI leverage: ${ai[idx]}`;
+    update();                       // <-- recalc + repaint
+  };
+
+  input.addEventListener('input',  e => apply(e.target.value));  // live drag
+  input.addEventListener('change', e => apply(e.target.value));  // mouse up / keyboard
+
+  wrap.appendChild(lab);
+  wrap.appendChild(input);
+  wrap.appendChild(meter);
   slidersDiv.appendChild(wrap);
 }
+
 
 tasks.forEach((t,i)=>makeSlider(t,i,ai[i]));
 
