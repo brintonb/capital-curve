@@ -6,7 +6,7 @@ Built in collaboration with ChatGPT to explore a trend highlighted by [Axios Pro
 > “AI agents can now get application startups to Series A with **80% less seed capital**.” — Jon McNeill, DVx
 
 ## 🌐 Live Demo
-**[View on GitHub Pages](https://arysky001.github.io/capital-curve)**  
+**[View on GitHub Pages]([https://brintonb.github.io/capital-curve/])**  
 _No downloads. No logins. Runs entirely in your browser._
 
 ---
@@ -40,5 +40,5 @@ The model is intentionally simplified — it’s a starting point for discussion
 ## 📦 How to Run Locally
 1. Clone the repo:
    ```bash
-   git clone https://github.com/arysky001/capital-curve.git
+   git clone https://brintonb.github.io/capital-curve/
    cd capital-curve
