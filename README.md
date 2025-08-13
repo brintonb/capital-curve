@@ -6,7 +6,7 @@ Built in collaboration with ChatGPT to explore a trend highlighted by [Axios Pro
 > “AI agents can now get application startups to Series A with **80% less seed capital**.” — Jon McNeill, DVx
 
 ## 🌐 Live Demo
-**[View on GitHub Pages]([https://brintonb.github.io/capital-curve/])**  
+**[View on GitHub Pages](https://brintonb.github.io/capital-curve/)**  
 _No downloads. No logins. Runs entirely in your browser._
 
 ---
