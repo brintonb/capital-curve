@@ -30,8 +30,13 @@
            text-decoration:none; font-weight:600; }
     @media (max-width: 780px) { .row, .row-3 { grid-template-columns: 1fr; } }
 
-    /* Chart container for gentle spacing */
-    .chart-wrap { padding: 6px 4px 0; }
+    /* Responsive, bounded chart size driven by CSS */
+    .chart-shell { width:100%; }
+    #chart {
+      width: 100%;
+      height: clamp(260px, 55vh, 560px); /* min 260px, scales with viewport, max 560px */
+      display: block;                    /* remove inline baseline gaps */
+    }
   </style>
 </head>
 <body>
@@ -77,13 +82,15 @@
     </div>
   </div>
 
-  <div class="card chart-wrap">
+  <div class="card">
     <div class="legend" style="margin-bottom:8px">
       <span class="legend-dot" style="background:#000"></span>Pre‑AI
       &nbsp;&nbsp;
       <span class="legend-dot" style="background:var(--bb-green)"></span>AI‑Adjusted
     </div>
-    <canvas id="chart"></canvas>
+    <div class="chart-shell">
+      <canvas id="chart"></canvas>
+    </div>
     <div class="hint" id="summary" style="margin-top:10px"></div>
   </div>
 
@@ -213,16 +220,9 @@ intensityEl.addEventListener('input', e => {
 });
 
 /* --------------------------
-   Chart (responsive sizing)
+   Chart (CSS controls height)
    -------------------------- */
 const ctx = document.getElementById('chart').getContext('2d');
-
-function getAspectRatio() {
-  const w = window.innerWidth || document.documentElement.clientWidth;
-  // Wider screens: wider chart; narrow screens: taller chart
-  return w >= 900 ? 1.9 : w >= 600 ? 1.5 : 1.25;
-}
-
 let chart = new Chart(ctx, {
   type: 'line',
   data: {
@@ -234,8 +234,7 @@ let chart = new Chart(ctx, {
   },
   options: {
     responsive: true,
-    maintainAspectRatio: true,
-    aspectRatio: getAspectRatio(),
+    maintainAspectRatio: false,   // let CSS (#chart height) drive the size
     scales: {
       y: {
         beginAtZero: true, suggestedMax: 11,
@@ -251,17 +250,9 @@ let chart = new Chart(ctx, {
     },
     plugins: {
       legend: { display:false },
-      tooltip: {
-        callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)} (rel.)` }
-      }
+      tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)} (rel.)` } }
     }
   }
-});
-
-// Update aspect ratio on resize for smooth scaling
-window.addEventListener('resize', () => {
-  chart.options.aspectRatio = getAspectRatio();
-  chart.resize();
 });
 
 /* --------------------------
@@ -275,7 +266,7 @@ function update() {
   chart.update();
 
   const baseSum = base.reduce((a,b)=>a+b,0).toFixed(1);
-  const adjSum = adj.reduce((a,b)=>a+b,0).toFixed(1);
+  const adjSum  = adj.reduce((a,b)=>a+b,0).toFixed(1);
   const earlyBase = base.slice(0,3).reduce((a,b)=>a+b,0);
   const earlyAdj  = adj.slice(0,3).reduce((a,b)=>a+b,0);
   const earlyDrop = ((1 - earlyAdj/earlyBase) * 100).toFixed(0);
@@ -283,14 +274,9 @@ function update() {
 }
 
 // share current state (sector + sliders) in URL hash
-function encodeState(){
-  const s = sectorSel.value;
-  return encodeURIComponent(JSON.stringify({s, ai, intensity}));
-}
-function decodeState(hash){
-  try { return JSON.parse(decodeURIComponent(hash.slice(1))); }
-  catch { return null; }
-}
+function encodeState(){ return encodeURIComponent(JSON.stringify({s: sectorSel.value, ai, intensity})); }
+function decodeState(hash){ try { return JSON.parse(decodeURIComponent(hash.slice(1))); } catch { return null; } }
+
 const copyBtn = document.getElementById('copyLink');
 const copyMsg = document.getElementById('copyMsg');
 copyBtn.addEventListener('click', async (e)=>{
@@ -308,10 +294,12 @@ if (st) {
   sectorSel.value = st.s || sectorSel.value;
   ai = Array.isArray(st.ai) ? st.ai : ai;
   intensity = typeof st.intensity === 'number' ? st.intensity : intensity;
+
   // hydrate sliders
   const sliderNodes = slidersDiv.querySelectorAll('input[type="range"]');
   sliderNodes.forEach((n,i)=>{ n.value = ai[i]; n.dispatchEvent(new Event('input')); });
-  intensityEl.value = intensity; intensityMeter.textContent = '×' + intensity.toFixed(2);
+  document.getElementById('intensity').value = intensity;
+  document.getElementById('intensityMeter').textContent = '×' + intensity.toFixed(2);
 }
 update();
 </script>
