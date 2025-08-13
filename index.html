@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Capital Curve Calculator — Deep Tech</title>
+  <!-- Optional brand-ish look -->
+  <link href="https://fonts.googleapis.com/css2?family=Signika:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bb-green: #A8D08D; /* Brinton-ish green */
+      --bb-black: #000000;
+      --muted: #666;
+      --bg: #fff;
+      --card: #f8f9fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Signika", system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      background: var(--bg);
+      color: var(--bb-black);
+      margin: 0; padding: 24px;
+      line-height: 1.35;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; }
+    .title { font-size: 28px; font-weight: 700; margin: 0 0 8px; }
+    .subtitle { color: var(--muted); margin: 0 0 20px; }
+    .card {
+      background: var(--card);
+      border-radius: 16px; padding: 16px 16px 8px; margin-bottom: 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.04);
+    }
+    label { display:block; font-weight:600; margin: 10px 0 6px; }
+    select, input[type="range"] {
+      width: 100%;
+    }
+    .row { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+    .row-3 { display: grid; gap: 16px; grid-template-columns: 1fr 1fr 1fr; }
+    .hint { color: var(--muted); font-size: 14px; }
+    .badge { display:inline-block; padding: 4px 8px; border-radius: 999px; background: #eef2ef; color: #1f3422; font-size: 12px; font-weight: 600; }
+    .legend-dot { width:12px; height:12px; border-radius:50%; display:inline-block; margin-right:6px; vertical-align:middle; }
+    .legend { font-size: 14px; color: var(--muted); }
+    .btn {
+      display:inline-block; padding:10px 14px; border-radius:10px; background: var(--bb-black); color:#fff; text-decoration:none; font-weight:600;
+    }
+    @media (max-width: 780px) { .row, .row-3 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="title">AI Capital Curve Calculator — Deep Tech</h1>
+  <p class="subtitle">Client‑side demo. No servers. Adjust AI leverage sliders to see how early capital compresses while regulatory/fabrication floors hold.</p>
+
+  <div class="card">
+    <div class="row-3">
+      <div>
+        <label>Sector</label>
+        <select id="sector">
+          <option>Biopharma</option>
+          <option>Biomed Device</option>
+          <option>Digital Health</option>
+        </select>
+      </div>
+      <div>
+        <label>Milestones</label>
+        <div class="hint">Ideation · Proof of Concept · Preclinical/Prototype · Reg/Clinical Gate · Series A</div>
+      </div>
+      <div>
+        <label>Assumptions</label>
+        <span class="badge">Floors enforce wet‑lab / fab / regulatory costs</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>AI leverage per task (0 = no help, 1 = full automation of that task’s share)</label>
+    <div id="sliders" class="row-3"></div>
+    <div class="hint">Tasks: Literature/landscaping, In‑silico modeling, Data ops/analysis, Regulatory drafting, Prototype automation</div>
+  </div>
+
+  <div class="card">
+    <div class="legend" style="margin-bottom:8px">
+      <span class="legend-dot" style="background:#000"></span>Pre‑AI
+      &nbsp;&nbsp;
+      <span class="legend-dot" style="background:var(--bb-green)"></span>AI‑Adjusted
+    </div>
+    <canvas id="chart" height="240"></canvas>
+    <div class="hint" id="summary" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card">
+    <label>Share safely</label>
+    <p class="hint">Host this file on GitHub Pages or Netlify (no backend). Post the link on LinkedIn. No uploads, cookies, or data collection.</p>
+    <a class="btn" href="#" id="copyLink">Copy shareable state link</a>
+    <span id="copyMsg" class="hint" style="margin-left:8px"></span>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+/* --------------------------
+   Model tensors & constants
+   -------------------------- */
+const sectors = ["Biopharma","Biomed Device","Digital Health"];
+const milestones = ["Ideation","Proof of Concept","Preclinical/Prototype","Reg/Clinical Gate","Series A"];
+const tasks = ["Literature & Landscaping","In‑silico Modeling/Simulation","Data Ops & Analysis","Regulatory Drafting","Prototype Automation"];
+
+// Baseline relative costs [sector x milestone] (Series A normalized ~10)
+const baseCost = [
+  [1.0, 3.0, 7.0, 9.0, 10.0], // Biopharma
+  [0.8, 2.5, 5.0, 8.0, 10.0], // Biomed Device
+  [0.6, 1.5, 3.0, 4.0, 10.0], // Digital Health
+];
+
+// Floors by milestone (what AI can’t compress below)
+const floors = [0.4, 1.2, 3.5, 7.5, 10.0];
+
+// Weights [sector x milestone x task], sum=1 across tasks at each (sector,milestone)
+const W = {
+  "Biopharma": {
+    "Ideation":[0.45,0.25,0.20,0.10,0.00],
+    "Proof of Concept":[0.30,0.25,0.25,0.20,0.00],
+    "Preclinical/Prototype":[0.10,0.20,0.20,0.25,0.25],
+    "Reg/Clinical Gate":[0.05,0.10,0.15,0.45,0.25],
+    "Series A":[0.00,0.00,0.10,0.70,0.20]
+  },
+  "Biomed Device": {
+    "Ideation":[0.35,0.25,0.25,0.15,0.00],
+    "Proof of Concept":[0.20,0.25,0.25,0.15,0.15],
+    "Preclinical/Prototype":[0.05,0.25,0.20,0.15,0.35],
+    "Reg/Clinical Gate":[0.05,0.10,0.15,0.35,0.35],
+    "Series A":[0.00,0.00,0.10,0.60,0.30]
+  },
+  "Digital Health": {
+    "Ideation":[0.30,0.15,0.45,0.10,0.00],
+    "Proof of Concept":[0.20,0.15,0.45,0.20,0.00],
+    "Preclinical/Prototype":[0.10,0.10,0.55,0.25,0.00],
+    "Reg/Clinical Gate":[0.05,0.05,0.60,0.30,0.00],
+    "Series A":[0.00,0.00,0.50,0.50,0.00]
+  }
+};
+
+// Defaults for AI leverage per task (0..1)
+let ai = [0.6, 0.6, 0.5, 0.4, 0.3];
+
+// Utility: dot product
+const dot = (a,b)=>a.reduce((s,v,i)=>s+v*b[i],0);
+
+// Compute adjusted costs for a sector
+function compute(sector) {
+  const si = sectors.indexOf(sector);
+  const base = baseCost[si];
+  const adj = milestones.map((m, idx)=>{
+    const red = Math.min(0.9, Math.max(0, dot(W[sector][m], ai))); // avoid >90% compression
+    const raw = base[idx] * (1 - red);
+    return Math.max(floors[idx], raw);
+  });
+  return { base, adj };
+}
+
+/* --------------------------
+   UI wiring
+   -------------------------- */
+const slidersDiv = document.getElementById('sliders');
+const sectorSel = document.getElementById('sector');
+const summaryDiv = document.getElementById('summary');
+
+function makeSlider(label, idx, val){
+  const wrap = document.createElement('div');
+  const lab = document.createElement('label');
+  lab.textContent = label;
+  const input = document.createElement('input');
+  input.type = 'range'; input.min = 0; input.max = 1; input.step = 0.05;
+  input.value = val;
+  const meter = document.createElement('div');
+  meter.className = 'hint'; meter.textContent = `AI leverage: ${val}`;
+  input.addEventListener('input', e=>{
+    ai[idx] = parseFloat(e.target.value);
+    meter.textContent = `AI leverage: ${e.target.value}`;
+    update();
+  });
+  wrap.appendChild(lab); wrap.appendChild(input); wrap.appendChild(meter);
+  slidersDiv.appendChild(wrap);
+}
+
+tasks.forEach((t,i)=>makeSlider(t,i,ai[i]));
+
+/* --------------------------
+   Chart
+   -------------------------- */
+const ctx = document.getElementById('chart').getContext('2d');
+let chart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: milestones,
+    datasets: [
+      { label:'Pre‑AI', data: [], borderColor:'#000', backgroundColor:'#000', tension:.25, pointRadius:4 },
+      { label:'AI‑Adjusted', data: [], borderColor:'rgba(168,208,141,1)', backgroundColor:'rgba(168,208,141,1)', tension:.25, pointRadius:4 }
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      y: { beginAtZero: true, suggestedMax: 11, grid: { color:'rgba(0,0,0,0.08)'} },
+      x: { grid: { color:'rgba(0,0,0,0.05)'} }
+    },
+    plugins: { legend: { display:false } }
+  }
+});
+
+function update() {
+  const sector = sectorSel.value;
+  const { base, adj } = compute(sector);
+  chart.data.datasets[0].data = base;
+  chart.data.datasets[1].data = adj;
+  chart.update();
+
+  const baseSum = base.reduce((a,b)=>a+b,0).toFixed(1);
+  const adjSum = adj.reduce((a,b)=>a+b,0).toFixed(1);
+  const earlyBase = base.slice(0,3).reduce((a,b)=>a+b,0);
+  const earlyAdj = adj.slice(0,3).reduce((a,b)=>a+b,0);
+  const earlyDrop = ((1 - earlyAdj/earlyBase) * 100).toFixed(0);
+  summaryDiv.textContent =
+    `${sector}: early‑stage capital ↓ ~${earlyDrop}% | Total (rel.): Pre‑AI ${baseSum} → AI‑Adjusted ${adjSum}`;
+}
+
+// share current state (sector + sliders) in URL hash
+function encodeState(){
+  const s = sectorSel.value;
+  return encodeURIComponent(JSON.stringify({s, ai}));
+}
+function decodeState(hash){
+  try { return JSON.parse(decodeURIComponent(hash.slice(1))); }
+  catch { return null; }
+}
+const copyBtn = document.getElementById('copyLink');
+const copyMsg = document.getElementById('copyMsg');
+copyBtn.addEventListener('click', async (e)=>{
+  e.preventDefault();
+  const url = `${location.origin}${location.pathname}#${encodeState()}`;
+  try { await navigator.clipboard.writeText(url); copyMsg.textContent = "Copied link!"; }
+  catch { copyMsg.textContent = url; }
+});
+
+sectorSel.addEventListener('change', update);
+
+// initialize with state if present
+const st = decodeState(location.hash);
+if (st) { sectorSel.value = st.s; ai = st.ai; const nodes = slidersDiv.querySelectorAll('input[type="range"]'); nodes.forEach((n,i)=>{ n.value = ai[i]; n.dispatchEvent(new Event('input')); }); }
+update();
+</script>
+</body>
+</html>
